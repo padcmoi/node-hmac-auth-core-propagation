@@ -1,0 +1,29 @@
+{
+  "name": "@naskot/node-hmac-auth-core-propagation",
+  "version": "0.0.0",
+  "description": "Credential propagation layer for @naskot/node-hmac-auth-core. RabbitMQ-backed orchestration. Work in progress.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/padcmoi/node-hmac-auth-core-propagation"
+  },
+  "homepage": "https://github.com/padcmoi/node-hmac-auth-core-propagation",
+  "bugs": {
+    "url": "https://github.com/padcmoi/node-hmac-auth-core-propagation/issues"
+  },
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "hmac",
+    "auth",
+    "propagation",
+    "rabbitmq",
+    "amqp",
+    "redis"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
