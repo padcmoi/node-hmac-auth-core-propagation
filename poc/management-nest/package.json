@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/main.ts",
-    "dev": "tsx watch src/main.ts"
+    "dev": "tsx watch src/main.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@naskot/node-hmac-auth-core": "file:../libs/naskot-node-hmac-auth-core-1.0.0.tgz",

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -p ${PORT:-3004} -H ${HOSTNAME:-0.0.0.0}"
+    "start": "next start -p ${PORT:-3004} -H ${HOSTNAME:-0.0.0.0}",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@naskot/node-hmac-auth-core": "file:../libs/naskot-node-hmac-auth-core-1.0.0.tgz",
