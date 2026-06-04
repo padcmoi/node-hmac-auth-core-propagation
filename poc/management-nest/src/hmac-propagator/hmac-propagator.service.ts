@@ -75,9 +75,14 @@ export class HmacPropagatorService implements OnApplicationBootstrap, OnModuleDe
         },
 
         fetchPendingPropagations: async () => {
+          // Publish-once policy: the broker holds the message in a durable queue with publisher
+          // confirms, so a single publish is enough. We only republish rows still in `pending`
+          // (publish never reached the broker). Rows in `sent` wait for the target's ACK back
+          // event, which flips them to `success`. A target offline for a week sees ONE message
+          // per (clientId, target) sitting in its queue, not thousands.
           const rows = await this.credentials
             .createQueryBuilder("c")
-            .innerJoinAndSelect("c.targets", "ct", "ct.status IN (:...s)", { s: ["pending", "sent"] })
+            .innerJoinAndSelect("c.targets", "ct", "ct.status = :s", { s: "pending" })
             .innerJoinAndSelect("ct.target", "t")
             .getMany();
           return rows.map((r) => ({

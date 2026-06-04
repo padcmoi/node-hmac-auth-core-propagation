@@ -96,11 +96,16 @@ async function build(): Promise<HmacPropagatorService> {
         }
       },
       fetchPendingPropagations: async () => {
+        // Publish-once policy: the broker holds the message in a durable queue with publisher
+        // confirms, so a single publish is enough. We only republish rows still in `pending`
+        // (publish never reached the broker). Rows in `sent` wait for the target's ACK back,
+        // which flips them to `success`. A target offline for a week sees ONE message per
+        // (clientId, target) sitting in its queue, not thousands.
         const [rows] = (await pool.query(
           `SELECT c.client_id, c.track, c.secret_plain, c.allowed_ips, c.expires_at, c.created_at, c.updated_at,
                   ct.target_amqp_queue, t.propagation_secret
              FROM hmac_credential c
-             INNER JOIN hmac_credential_target ct ON ct.client_id = c.client_id AND ct.status IN ('pending', 'sent')
+             INNER JOIN hmac_credential_target ct ON ct.client_id = c.client_id AND ct.status = 'pending'
              INNER JOIN hmac_propagation_target t ON t.target_amqp_queue = ct.target_amqp_queue`
         )) as [Array<Record<string, unknown>>, unknown];
         const byClient = new Map<string, PendingPropagation>();
