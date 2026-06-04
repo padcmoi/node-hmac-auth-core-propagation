@@ -106,7 +106,7 @@ services:
       AMQP_QUEUE: mgmt-nest
       PROPAGATION_SECRET: secret-of-mgmt-nest
       REDIS_URL: redis://redis-mgmt:6379
-      HMAC_SECRET_TOKEN: mesh-pepper-shared
+      HMAC_SECRET_TOKEN: pepper-of-mgmt-nest
       DB_HOST: mariadb
       DB_PORT: "3306"
       DB_USER: root
@@ -139,7 +139,7 @@ services:
       AMQP_QUEUE: c-nest
       PROPAGATION_SECRET: secret-of-c-nest
       REDIS_URL: redis://redis-c-nest:6379
-      HMAC_SECRET_TOKEN: mesh-pepper-shared
+      HMAC_SECRET_TOKEN: pepper-of-c-nest
     ports:
       - "3002:3002"
     depends_on:
@@ -169,7 +169,7 @@ services:
       AMQP_QUEUE: nuxt
       PROPAGATION_SECRET: secret-of-nuxt
       REDIS_URL: redis://redis-nuxt:6379
-      HMAC_SECRET_TOKEN: mesh-pepper-shared
+      HMAC_SECRET_TOKEN: pepper-of-nuxt
       DB_HOST: mariadb
       DB_PORT: "3306"
       DB_USER: root
@@ -204,7 +204,7 @@ services:
       AMQP_QUEUE: next
       PROPAGATION_SECRET: secret-of-next
       REDIS_URL: redis://redis-next:6379
-      HMAC_SECRET_TOKEN: mesh-pepper-shared
+      HMAC_SECRET_TOKEN: pepper-of-next
       DB_HOST: mariadb
       DB_PORT: "3306"
       DB_USER: root
