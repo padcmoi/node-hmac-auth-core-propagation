@@ -17,8 +17,6 @@ next-env.d.ts
 # Local tgz packed from sibling lib for dev wiring
 *.tgz
 
-# Lockfile-less by design for a library; consumers own their lockfile
-package-lock.json
 pnpm-lock.yaml
 yarn.lock
 
