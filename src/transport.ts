@@ -122,9 +122,10 @@ export async function createTransport(input: CreateTransportInput): Promise<Tran
 
   async function publishToQueue(queueName: string, payload: Buffer) {
     if (!confirmCh) throw new Error("amqp not connected");
+    const ch = confirmCh;
     await new Promise<void>((resolve, reject) => {
-      const ok = confirmCh!.publish("", queueName, payload, { persistent: true, contentType: "application/json" }, (err) => {
-        if (err) reject(err);
+      const ok = ch.publish("", queueName, payload, { persistent: true, contentType: "application/json" }, (err) => {
+        if (err) reject(err instanceof Error ? err : new Error(String(err)));
         else resolve();
       });
       if (!ok) {

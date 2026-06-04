@@ -1,3 +1,4 @@
+import type { ConsumeMessage } from "amqplib";
 import { buildConsumeHandler } from "./consume.js";
 import { HmacPropagationError } from "./errors.js";
 import { runSync } from "./sync.js";
@@ -28,7 +29,7 @@ export async function createPropagator(options: PropagatorOptions): Promise<Prop
   assertOptions(options);
   const logger = options.logger ?? NOOP_LOGGER;
 
-  const consumeHandlerHolder: { handler: (msg: import("amqplib").ConsumeMessage) => Promise<void> } = {
+  const consumeHandlerHolder: { handler: (msg: ConsumeMessage) => Promise<void> } = {
     handler: async () => {},
   };
 
