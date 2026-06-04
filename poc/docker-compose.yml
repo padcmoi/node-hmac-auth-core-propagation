@@ -62,24 +62,32 @@ services:
   redis-mgmt:
     image: redis:7-alpine
     container_name: hmac-poc-redis-mgmt
+    ports:
+      - "6379:6379"
     networks:
       - poc
 
   redis-c-nest:
     image: redis:7-alpine
     container_name: hmac-poc-redis-c-nest
+    ports:
+      - "6380:6379"
     networks:
       - poc
 
   redis-nuxt:
     image: redis:7-alpine
     container_name: hmac-poc-redis-nuxt
+    ports:
+      - "6381:6379"
     networks:
       - poc
 
   redis-next:
     image: redis:7-alpine
     container_name: hmac-poc-redis-next
+    ports:
+      - "6382:6379"
     networks:
       - poc
 
