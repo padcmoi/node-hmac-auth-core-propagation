@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@naskot/node-hmac-auth-core": "file:../libs/naskot-node-hmac-auth-core-1.0.0.tgz",
+    "@naskot/node-hmac-auth-core": "^1.0.0",
     "@naskot/node-hmac-auth-core-propagation": "file:../..",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",

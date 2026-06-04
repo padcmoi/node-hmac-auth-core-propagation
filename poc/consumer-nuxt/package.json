@@ -10,7 +10,7 @@
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
-    "@naskot/node-hmac-auth-core": "file:../libs/naskot-node-hmac-auth-core-1.0.0.tgz",
+    "@naskot/node-hmac-auth-core": "^1.0.0",
     "@naskot/node-hmac-auth-core-propagation": "file:../..",
     "@tailwindcss/vite": "^4.0.0",
     "amqplib": "^0.10.4",

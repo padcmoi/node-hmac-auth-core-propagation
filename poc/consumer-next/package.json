@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@naskot/node-hmac-auth-core": "file:../libs/naskot-node-hmac-auth-core-1.0.0.tgz",
+    "@naskot/node-hmac-auth-core": "^1.0.0",
     "@naskot/node-hmac-auth-core-propagation": "file:../..",
     "amqplib": "^0.10.4",
     "mysql2": "^3.11.0",
