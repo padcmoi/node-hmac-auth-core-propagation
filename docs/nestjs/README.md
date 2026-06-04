@@ -109,9 +109,11 @@ export class HmacPropagatorService implements OnModuleInit, OnModuleDestroy {
           });
         },
         fetchPendingPropagations: async () => {
+          // Publish-once: only return `pending` rows. `sent` rows already live in the
+          // durable AMQP queue; republishing them would spam the broker for nothing.
           const rows = await this.credentials
             .createQueryBuilder("c")
-            .innerJoinAndSelect("c.targets", "ct", "ct.status IN (:...s)", { s: ["pending", "sent"] })
+            .innerJoinAndSelect("c.targets", "ct", "ct.status = :s", { s: "pending" })
             .innerJoinAndSelect("ct.target", "t")
             .getMany();
           return rows.map((r) => ({

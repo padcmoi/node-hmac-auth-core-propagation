@@ -13,6 +13,14 @@ Core --> Lib : record (exists)
 Lib -> Mgmt : rotateCredentialSecret({ clientId, track, secretPlain: newPlain })
 Mgmt -> DB : UPDATE Table 1 SET secret_plain = newPlain
 Mgmt -> DB : UPDATE Table 3 WHERE client_id = ? SET status='pending', attempt_count=0, ...
+Lib -> Core : hashClientSecret(newPlain, pepper)
+Lib -> Core : setSecretHash(clientId, newHash)
+note right of Lib
+  New hash applied locally before
+  returning, so the rotate is effective
+  on this peer even if no remote target
+  is reachable right now.
+end note
 Lib --> App : { clientId }
 
 == later ==

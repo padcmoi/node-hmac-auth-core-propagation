@@ -23,9 +23,12 @@ its peer dep `@naskot/node-hmac-auth-core` 1.0.0.
 | `consumer-nuxt`   | Nuxt v4 + Tailwind v4. Own MariaDB schema. UI dashboard    | full mode    | 3003 |
 | `consumer-next`   | Next.js 15 + Tailwind v4. Own MariaDB schema. UI dashboard | full mode    | 3004 |
 
-Shared `HMAC_SECRET_TOKEN = mesh-pepper-shared`. Each peer has its own
-`PROPAGATION_SECRET`. Table 2 in each authority schema is seeded with the
-secrets of the other peers.
+**Secrets layout.** Each peer carries its **own** `HMAC_SECRET_TOKEN` (a private
+pepper used to hash the plain into the stored hash). The lib propagates the
+already-computed hash on the wire; remote peers store it as-is and never need to
+re-compute it, so peppers are not shared. Each peer also has its own
+`PROPAGATION_SECRET`, used to sign outbound events. Table 2 in every authority
+schema seeds the propagation secrets of the other peers.
 
 ## Libs
 
@@ -55,11 +58,16 @@ docker compose down -v
 
 The `management-nest` authority exposes an admin HTTP API:
 
-- `POST /admin/ensure   { clientId, secret, targets[] }` propagate add/update
-- `POST /admin/rotate   { clientId, secret }` rotate the plain
-- `POST /admin/revoke   { clientId, targets[] }` propagate delete
+- `POST /admin/ensure         { clientId, secret, targets[] }` propagate add/update
+- `POST /admin/rotate         { clientId, secret }` rotate the plain
+- `POST /admin/revoke         { clientId, targets[] }` propagate delete
 - `POST /admin/sync` run sync now
 - `GET  /admin/state` inspect the 4 tables
+- `POST /admin/targets        { targetAmqpQueue, propagationSecret, note? }` upsert a peer in Table 2
+- `DELETE /admin/targets/:q` drop a peer from Table 2 (refuses the self-target)
+
+The Nuxt and Next.js peers expose the same surface under `/api/*` plus a
+`/api/targets` route (POST upsert, DELETE `/api/targets/:queue`).
 
 ### 1. ensure + sync
 
@@ -123,3 +131,38 @@ Open <http://localhost:3003> in a browser. The dashboard reads the state of all 
 Redis instances. Submit the form to call `propagator.ensure(...)` against the Nuxt
 authority and watch the propagation roll across the mesh. The Next.js peer at
 <http://localhost:3004> has the same UI on its own MariaDB schema.
+
+The dashboards live-tail at 1 Hz: the "All peers' Redis (direct connection)"
+panel and the "ClientId (local)" dropdown both refresh every second so the effect
+of an ensure/rotate/revoke is visible without manual reload.
+
+### 6. add/remove a propagation target
+
+From the Nuxt UI section "Propagation targets (Table 2)" (or the corresponding
+section on Next, or the curl below against mgmt-nest), upsert a new peer into
+Table 2 and watch subsequent ensures fan out to it. The self-target row is
+visually locked: deleting it would break inbound ACK signing.
+
+```sh
+curl -s -X POST http://localhost:3001/admin/targets \
+  -H "content-type: application/json" \
+  -d '{"targetAmqpQueue":"partner-x","propagationSecret":"secret-of-partner-x","note":"demo"}'
+
+curl -s -X DELETE http://localhost:3001/admin/targets/partner-x
+```
+
+## Local dev (pnpm dev outside Docker)
+
+The compose file publishes every Redis on a distinct host port
+(`6379` mgmt, `6380` c-nest, `6381` nuxt, `6382` next) plus MariaDB (`3306`) and
+RabbitMQ (`5672`). Each Nuxt / Next consumer ships a `.env` (committed) that
+points every connection at `localhost:<port>`. To dev one peer locally:
+
+```sh
+docker compose stop consumer-nuxt        # free the 3003 port + AMQP queue
+cd consumer-nuxt && pnpm dev
+```
+
+Same for `consumer-next` on 3004. The `.dockerignore` excludes the local `.env*`
+files from the image so the Docker container keeps using its compose-injected
+environment.

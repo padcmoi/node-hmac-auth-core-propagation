@@ -170,10 +170,17 @@ SELECT
   ct.target_amqp_queue, t.propagation_secret
 FROM hmac_credential c
 INNER JOIN hmac_credential_target ct
-  ON ct.client_id = c.client_id AND ct.status IN ('pending', 'sent')
+  ON ct.client_id = c.client_id AND ct.status = 'pending'
 INNER JOIN hmac_propagation_target t
   ON t.target_amqp_queue = ct.target_amqp_queue;
 ```
+
+**Publish-once policy.** The adapter MUST return rows in `status='pending'` only,
+never `'sent'`. A `pending` row means the publish has not reached the broker yet
+(or never started). Once `markTargetSent` flips it to `sent`, the message lives in
+the durable AMQP queue and we wait for the target's ACK back to flip it to
+`success`. Republishing `sent` rows would spam the broker with millions of
+duplicates while a target is offline.
 
 The callback groups rows by `client_id`, composes `PendingPropagation[]`, and never
 logs the `propagation_secret`.

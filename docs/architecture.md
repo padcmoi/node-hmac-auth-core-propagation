@@ -66,15 +66,19 @@ src/
 
 `createPropagator({...management: {...}})`. In addition to receive-only:
 
-- `ensure(input)`: delegate to `management.upsertCredentialWithTargets` then return.
+- `ensure(input)`: delegate to `management.upsertCredentialWithTargets`, then
+  apply locally (`hashClientSecret` + `setSecretHash`) so the credential is usable
+  on the originating peer immediately even if no remote target is selected.
 - `rotate(input)`: verify the client exists in `hmacAuth.clients.get`, delegate to
-  `management.rotateCredentialSecret`, return.
+  `management.rotateCredentialSecret`, then apply the new hash locally so the
+  rotate takes effect on this peer right away.
 - `revoke(input)`: delegate to `management.upsertCredentialWithTargets` with
-  `op="credential.delete"`, return.
-- `sync()`: read pending propagations from `management.fetchPendingPropagations`,
-  enrich each plain with a UUID, hash via `hashClientSecret`, apply locally, publish
-  one event per target with the target's `propagationSecret`, record the in-flight
-  in the Redis ack store, call `markTargetSent` per target.
+  `op="credential.delete"`, then drop the credential locally via `clients.delete`.
+- `sync()`: read pending propagations from `management.fetchPendingPropagations`
+  (must return only rows in `status='pending'`), enrich each plain with a UUID,
+  hash via `hashClientSecret`, apply locally (idempotent), publish one event per
+  target with the target's `propagationSecret`, record the in-flight in the Redis
+  ack store, call `markTargetSent` per target.
 - The inbound ACK pipeline is also management-aware: it resolves the source's secret
   via `fetchSourcePropagationSecret`, calls `markTargetSuccess`/`markTargetError`,
   and when the pending set for the client becomes empty calls
@@ -86,8 +90,15 @@ src/
 - One durable queue per peer, name `hmac-<amqpQueue>.queue`.
 - `routingKey = queue name`. Targeting is per message.
 - Vhost `hmac-credentials` (literal default).
-- `prefetch=1`, `publisherConfirms=true`.
+- `prefetch=1`, `publisherConfirms=true`, `heartbeat=10s`.
 - No DLQ. Transient failures NACK requeue=true.
+- **Deferred `basic.consume` registration.** The transport opens the connection +
+  channels + `assertQueue` synchronously at boot, but it does **not** register the
+  consumer callback until the propagator has installed the real message handler
+  and calls `transport.startConsume()`. Without this, a redelivered message could
+  race the no-op placeholder handler, sit Unacked forever on the channel, and
+  freeze the consumer (prefetch=1). The deferred-consume pattern guarantees that
+  every restart picks up its full queue regardless of message age.
 
 ## Redis layout
 
@@ -115,6 +126,16 @@ forge the rest of the mesh. Rotation of a peer's secret is out of scope of the l
 - **0 desync**. A credential row stays in `status='pending'` until terminal. No DLQ.
 - **Strict obedience to RabbitMQ**. Any valid inbound event is applied locally even
   in receive-only mode; the local store is the source of truth for the verifier.
+  The only valid reasons to drop an inbound message are: `propagationSecret`
+  mismatch (security), stale event vs the local monotonic cursor (anti-regression),
+  or malformed payload.
+- **Zero-loss on restart**. A peer that comes back UP after being down for any
+  duration drains its queue in FIFO order with no message left behind, thanks to
+  durable queues + persistent messages + deferred `basic.consume` + 10s heartbeat.
+- **Publish-once on the broker**. The adapter only republishes rows in
+  `status='pending'`; `sent` rows wait for the target's ACK back to flip them to
+  `success`. A target offline for a week sees ONE message per (clientId, target)
+  in its queue, not thousands.
 - **Plain transiently in the operator's BDD**. NULL'd via the
   `markCredentialFullyPropagated` callback once all targets are terminal. Never on
   the wire.

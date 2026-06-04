@@ -142,13 +142,13 @@ throw `HmacPropagationError("MANAGEMENT_NOT_CONFIGURED")`.
 
 ## Surface
 
-| Helper                | Mode   | What                                                                              |
-| --------------------- | ------ | --------------------------------------------------------------------------------- |
-| `propagator.close()`  | always | Graceful shutdown of the AMQP connection and the consume loop                     |
-| `propagator.ensure()` | full   | Add or update a credential, write its targets in `status='pending'`               |
-| `propagator.rotate()` | full   | Rotate the plain for an existing clientId; lib leaves target discovery to the BDD |
-| `propagator.revoke()` | full   | Delete propagated: NULL the plain on Table 1, repropagate `credential.delete`     |
-| `propagator.sync()`   | full   | Read pending rows, apply locally, publish one event per target with target secret |
+| Helper                | Mode   | What                                                                                                                  |
+| --------------------- | ------ | --------------------------------------------------------------------------------------------------------------------- |
+| `propagator.close()`  | always | Graceful shutdown of the AMQP connection and the consume loop                                                         |
+| `propagator.ensure()` | full   | Add or update a credential, write its targets in `status='pending'`, **apply locally immediately** (no target needed) |
+| `propagator.rotate()` | full   | Rotate the plain for an existing clientId, **apply the new hash locally immediately**                                 |
+| `propagator.revoke()` | full   | Delete propagated: NULL the plain on Table 1, repropagate `credential.delete`, **drop locally immediately**           |
+| `propagator.sync()`   | full   | Read pending rows, apply locally, publish one event per target with target secret                                     |
 
 ## SQL schema and TypeORM entities
 
