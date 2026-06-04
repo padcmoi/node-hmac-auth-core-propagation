@@ -1,0 +1,51 @@
+@startuml seq-ensure-sync
+title ensure() then sync() with three targets B, C, D
+
+actor App
+participant "propagator (this lib)" as Lib
+participant "management" as Mgmt
+database "MariaDB" as DB
+participant "hmacAuth.clients" as Core
+queue "RabbitMQ" as Q
+participant "Peer B" as B
+participant "Peer C" as C
+participant "Peer D" as D
+
+App -> Lib : ensure(client_partner_a, plain, [B, C, D])
+Lib -> Mgmt : upsertCredentialWithTargets(...)
+Mgmt -> DB : UPSERT Table 1 + Table 3 (status=pending)
+Lib --> App : { clientId, op }
+
+== later, from cron ==
+
+App -> Lib : sync()
+Lib -> Mgmt : fetchPendingPropagations()
+Mgmt -> DB : SELECT JOIN Table 1 + 3 + 2
+Mgmt --> Lib : pending[]
+Lib -> Core : enrich(plain + uuid) + hashClientSecret
+Lib -> Core : setSecretHash(client_partner_a)
+loop for each target in {B, C, D}
+  Lib -> Q : publish hmac-<target>.queue\n(eventId, propagationSecret=target)
+  Q --> Lib : broker confirm
+  Lib -> Mgmt : markTargetSent
+end
+
+Q -> B : event
+B -> B : verify + apply locally
+B -> Q : publish ack to hmac-x-authority-hmac.queue
+Q -> Lib : ack from B
+Lib -> Mgmt : markTargetSuccess(client_partner_a, B)
+
+Q -> C : event
+C -> Q : ack
+Q -> Lib : ack from C
+Lib -> Mgmt : markTargetSuccess(client_partner_a, C)
+
+Q -> D : event
+D -> Q : ack
+Q -> Lib : ack from D
+Lib -> Mgmt : markTargetSuccess(client_partner_a, D)
+Lib -> Mgmt : markCredentialFullyPropagated\n(finalStatus="success")
+Mgmt -> DB : UPDATE Table 1 SET secret_plain = NULL
+
+@enduml

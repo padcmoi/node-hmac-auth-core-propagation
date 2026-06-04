@@ -1,0 +1,26 @@
+@startuml seq-rotate
+title rotate() then sync() for an existing clientId
+
+actor App
+participant "propagator (this lib)" as Lib
+participant "management" as Mgmt
+database "MariaDB" as DB
+participant "hmacAuth.clients" as Core
+
+App -> Lib : rotate({ clientId, secret: newPlain })
+Lib -> Core : clients.get(clientId)
+Core --> Lib : record (exists)
+Lib -> Mgmt : rotateCredentialSecret({ clientId, track, secretPlain: newPlain })
+Mgmt -> DB : UPDATE Table 1 SET secret_plain = newPlain
+Mgmt -> DB : UPDATE Table 3 WHERE client_id = ? SET status='pending', attempt_count=0, ...
+Lib --> App : { clientId }
+
+== later ==
+App -> Lib : sync()
+note over Lib, DB
+  Same flow as ensure -> publish to all
+  existing targets with new hash, follow ACKs,
+  NULL the plain when fully propagated.
+end note
+
+@enduml

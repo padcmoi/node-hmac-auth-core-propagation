@@ -1,0 +1,30 @@
+@startuml seq-receive-only
+title Receive-only peer applies an inbound event and acks back
+
+actor "Source A" as A
+queue "RabbitMQ" as Q
+participant "propagator (this lib)" as Lib
+participant "hmacAuth.clients" as Core
+database "Redis (cursor)" as R
+
+A -> Q : publish hmac-<peer>.queue\n(eventId, propagationSecret=peer)
+
+Q -> Lib : consume
+Lib -> Lib : decode + timingSafeEqual propagationSecret
+Lib -> R : read cursor
+R --> Lib : null or (lastTs, lastEventId)
+Lib -> Lib : isStrictlyNewer? yes
+Lib -> Core : setSecretHash or delete
+Lib -> R : write cursor (ts, eventId)
+Lib -> Q : publish ACK back\nhmac-<source>.queue\npropagationSecret = ""
+Lib -> Q : ack original message
+
+note over Lib
+  Receive-only: no management -> no
+  fetchSourcePropagationSecret. ACK is
+  published with empty secret; the
+  source warn-drops it but the local
+  apply already happened.
+end note
+
+@enduml

@@ -1,0 +1,51 @@
+@startuml architecture
+title @naskot/node-hmac-auth-core-propagation v1.0.0 - module layout
+
+skinparam componentStyle uml2
+
+package "Consumer" as consumer {
+  [Application] as app
+}
+
+package "@naskot/node-hmac-auth-core-propagation" as lib {
+  [createPropagator] as factory
+  [propagator.ensure / rotate / revoke / sync / close] as helpers
+  [consume loop] as consume
+  [sync pipeline] as sync
+  [wire (encode + decode + queue naming)] as wire
+  [cursor (Redis)] as cursor
+  [ack-store (Redis)] as ack
+  [transport (amqplib)] as transport
+}
+
+package "@naskot/node-hmac-auth-core" as core {
+  [clients.setSecretHash / delete] as clients
+  [hashClientSecret] as hasher
+}
+
+cloud "RabbitMQ" as broker {
+  queue "hmac-<peer>.queue" as q
+}
+
+database "Redis" as redis
+database "MariaDB (consumer)" as bdd
+
+app --> factory : createPropagator(options)
+factory --> helpers : returns
+app --> helpers : ensure / rotate / revoke / sync
+helpers --> sync : sync()
+helpers --> bdd : management callbacks
+sync --> hasher : enrich + hash
+sync --> clients : applyLocal
+sync --> transport : publish
+sync --> ack
+transport --> q
+q --> consume : inbound
+consume --> wire : decode
+consume --> cursor
+consume --> clients : applyLocal
+consume --> transport : publish ACK back
+cursor --> redis
+ack --> redis
+
+@enduml
