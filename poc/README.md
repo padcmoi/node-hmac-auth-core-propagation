@@ -9,19 +9,24 @@ its peer dep `@naskot/node-hmac-auth-core` 1.0.0.
 
 ## Topology
 
-| Service           | Role                                                       | Mode         | Port |
-| ----------------- | ---------------------------------------------------------- | ------------ | ---- |
-| `rabbitmq`        | Broker. Vhost `hmac-credentials`, mgmt UI on 15672         | -            | 5672 |
-| `mariadb`         | Three schemas: `nest_db`, `nuxt_db`, `next_db`             | -            | 3306 |
-| `phpmyadmin`      | Web UI for the MariaDB instance, auto-logs in as root      | -            | 8080 |
-| `redis-mgmt`      | Redis for the NestJS authority                             | -            | -    |
-| `redis-c-nest`    | Redis for the NestJS receive-only consumer                 | -            | -    |
-| `redis-nuxt`      | Redis for the Nuxt v4 peer                                 | -            | -    |
-| `redis-next`      | Redis for the Next.js 15 peer                              | -            | -    |
-| `management-nest` | NestJS authority. Drives ensure/rotate/revoke + sync cron  | full mode    | 3001 |
-| `consumer-nest`   | NestJS peer with HMAC verifier. No management adapter      | receive-only | 3002 |
-| `consumer-nuxt`   | Nuxt v4 + Tailwind v4. Own MariaDB schema. UI dashboard    | full mode    | 3003 |
-| `consumer-next`   | Next.js 15 + Tailwind v4. Own MariaDB schema. UI dashboard | full mode    | 3004 |
+Host ports use the `3X000` range so the POC never collides with locally-running
+dev servers, VSCode-forwarded ports, system MySQL / RabbitMQ / Redis, etc. Each
+container still listens on its canonical port internally — the mapping below is
+`host → container`.
+
+| Service           | Role                                                       | Mode         | Host → container |
+| ----------------- | ---------------------------------------------------------- | ------------ | ---------------- |
+| `rabbitmq`        | Broker. Vhost `hmac-credentials`, mgmt UI on 35673         | -            | 35672 → 5672     |
+| `mariadb`         | Three schemas: `nest_db`, `nuxt_db`, `next_db`             | -            | 33306 → 3306     |
+| `phpmyadmin`      | Web UI for the MariaDB instance, auto-logs in as root      | -            | 38080 → 80       |
+| `redis-mgmt`      | Redis for the NestJS authority                             | -            | 36379 → 6379     |
+| `redis-c-nest`    | Redis for the NestJS receive-only consumer                 | -            | 36380 → 6379     |
+| `redis-nuxt`      | Redis for the Nuxt v4 peer                                 | -            | 36381 → 6379     |
+| `redis-next`      | Redis for the Next.js 15 peer                              | -            | 36382 → 6379     |
+| `management-nest` | NestJS authority. Drives ensure/rotate/revoke + sync cron  | full mode    | 33001 → 3001     |
+| `consumer-nest`   | NestJS peer with HMAC verifier. No management adapter      | receive-only | 33002 → 3002     |
+| `consumer-nuxt`   | Nuxt v4 + Tailwind v4. Own MariaDB schema. UI dashboard    | full mode    | 33003 → 3003     |
+| `consumer-next`   | Next.js 15 + Tailwind v4. Own MariaDB schema. UI dashboard | full mode    | 33004 → 3004     |
 
 **Secrets layout.** Each peer carries its **own** `HMAC_SECRET_TOKEN` (a private
 pepper used to hash the plain into the stored hash). The lib propagates the
@@ -69,12 +74,12 @@ The Nuxt and Next.js peers expose the same surface under `/api/*` plus a
 ### 1. ensure + sync
 
 ```sh
-curl -s -X POST http://localhost:3001/admin/ensure \
+curl -s -X POST http://localhost:33001/admin/ensure \
   -H "content-type: application/json" \
   -d '{"clientId":"client_demo","secret":"plain-text-secret",
        "targets":["c-nest","nuxt","next"]}'
 
-curl -s -X POST http://localhost:3001/admin/sync
+curl -s -X POST http://localhost:33001/admin/sync
 ```
 
 Check that `client_demo` now exists in every peer's Redis:
@@ -89,7 +94,7 @@ docker exec hmac-poc-redis-next   redis-cli HGETALL hmac:http:clients
 ### 2. signed call from authority to consumer-nest
 
 ```sh
-curl -s -X POST http://localhost:3001/admin/call-target \
+curl -s -X POST http://localhost:33001/admin/call-target \
   -H "content-type: application/json" \
   -d '{"target":"http://consumer-nest:3002/api/echo","clientId":"client_demo","secret":"plain-text-secret"}'
 ```
@@ -100,11 +105,11 @@ hash arrived intact via the propagation pipeline.
 ### 3. rotate
 
 ```sh
-curl -s -X POST http://localhost:3001/admin/rotate \
+curl -s -X POST http://localhost:33001/admin/rotate \
   -H "content-type: application/json" \
   -d '{"clientId":"client_demo","secret":"new-plain-secret"}'
 
-curl -s -X POST http://localhost:3001/admin/sync
+curl -s -X POST http://localhost:33001/admin/sync
 ```
 
 Subsequent signed calls must use the new secret; the old one is rejected by every
@@ -113,21 +118,21 @@ peer.
 ### 4. revoke
 
 ```sh
-curl -s -X POST http://localhost:3001/admin/revoke \
+curl -s -X POST http://localhost:33001/admin/revoke \
   -H "content-type: application/json" \
   -d '{"clientId":"client_demo","targets":["c-nest","nuxt","next"]}'
 
-curl -s -X POST http://localhost:3001/admin/sync
+curl -s -X POST http://localhost:33001/admin/sync
 ```
 
 `client_demo` disappears from every peer's Redis.
 
 ### 5. drive ensure from the Nuxt UI
 
-Open <http://localhost:3003> in a browser. The dashboard reads the state of all 4
-Redis instances. Submit the form to call `propagator.ensure(...)` against the Nuxt
-authority and watch the propagation roll across the mesh. The Next.js peer at
-<http://localhost:3004> has the same UI on its own MariaDB schema.
+Open <http://localhost:33003> in a browser. The dashboard reads the state of all
+4 Redis instances. Submit the form to call `propagator.ensure(...)` against the
+Nuxt authority and watch the propagation roll across the mesh. The Next.js peer
+at <http://localhost:33004> has the same UI on its own MariaDB schema.
 
 The dashboards live-tail at 1 Hz: the "All peers' Redis (direct connection)"
 panel and the "ClientId (local)" dropdown both refresh every second so the effect
@@ -141,11 +146,11 @@ Table 2 and watch subsequent ensures fan out to it. The self-target row is
 visually locked: deleting it would break inbound ACK signing.
 
 ```sh
-curl -s -X POST http://localhost:3001/admin/targets \
+curl -s -X POST http://localhost:33001/admin/targets \
   -H "content-type: application/json" \
   -d '{"targetAmqpQueue":"partner-x","propagationSecret":"secret-of-partner-x","note":"demo"}'
 
-curl -s -X DELETE http://localhost:3001/admin/targets/partner-x
+curl -s -X DELETE http://localhost:33001/admin/targets/partner-x
 ```
 
 ## End-to-end test harness

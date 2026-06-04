@@ -14,8 +14,13 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
       RABBITMQ_DEFAULT_VHOST: hmac-credentials
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      # High-range host ports (3X000) so the POC does not collide with the
+      # most common locally-running tools (dev servers, VSCode-forwarded
+      # ports, system MySQL / RabbitMQ / Redis). Container-internal ports
+      # stay at their defaults so cross-peer DNS calls inside the Docker
+      # network keep using the canonical numbers.
+      - "35672:5672"
+      - "35673:15672"
     networks:
       - poc
     healthcheck:
@@ -31,7 +36,7 @@ services:
       MARIADB_ROOT_PASSWORD: root
       MARIADB_DATABASE: nest_db
     ports:
-      - "3306:3306"
+      - "33306:3306"
     volumes:
       - ./scripts/init-mariadb.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
@@ -52,7 +57,7 @@ services:
       PMA_PASSWORD: root
       UPLOAD_LIMIT: 64M
     ports:
-      - "8080:80"
+      - "38080:80"
     depends_on:
       mariadb:
         condition: service_healthy
@@ -63,7 +68,7 @@ services:
     image: redis:7-alpine
     container_name: hmac-poc-redis-mgmt
     ports:
-      - "6379:6379"
+      - "36379:6379"
     networks:
       - poc
 
@@ -71,7 +76,7 @@ services:
     image: redis:7-alpine
     container_name: hmac-poc-redis-c-nest
     ports:
-      - "6380:6379"
+      - "36380:6379"
     networks:
       - poc
 
@@ -79,7 +84,7 @@ services:
     image: redis:7-alpine
     container_name: hmac-poc-redis-nuxt
     ports:
-      - "6381:6379"
+      - "36381:6379"
     networks:
       - poc
 
@@ -87,7 +92,7 @@ services:
     image: redis:7-alpine
     container_name: hmac-poc-redis-next
     ports:
-      - "6382:6379"
+      - "36382:6379"
     networks:
       - poc
 
@@ -113,7 +118,7 @@ services:
       DB_PASSWORD: root
       DB_NAME: nest_db
     ports:
-      - "3001:3001"
+      - "33001:3001"
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -141,7 +146,7 @@ services:
       REDIS_URL: redis://redis-c-nest:6379
       HMAC_SECRET_TOKEN: pepper-of-c-nest
     ports:
-      - "3002:3002"
+      - "33002:3002"
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -177,7 +182,7 @@ services:
       DB_NAME: nuxt_db
       PEER_REDIS_URLS: redis://redis-mgmt:6379,redis://redis-c-nest:6379,redis://redis-nuxt:6379,redis://redis-next:6379
     ports:
-      - "3003:3003"
+      - "33003:3003"
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -212,7 +217,7 @@ services:
       DB_NAME: next_db
       PEER_REDIS_URLS: redis://redis-mgmt:6379,redis://redis-c-nest:6379,redis://redis-nuxt:6379,redis://redis-next:6379
     ports:
-      - "3004:3004"
+      - "33004:3004"
     depends_on:
       rabbitmq:
         condition: service_healthy
