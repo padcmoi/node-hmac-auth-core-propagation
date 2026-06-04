@@ -7,7 +7,6 @@ WORKDIR /workspace
 
 COPY package.json README.md ./
 COPY dist ./dist
-COPY poc/libs ./poc/libs
 COPY poc/management-nest ./poc/management-nest
 
 WORKDIR /workspace/poc/management-nest

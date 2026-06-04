@@ -7,7 +7,6 @@ WORKDIR /workspace
 
 COPY package.json README.md ./
 COPY dist ./dist
-COPY poc/libs ./poc/libs
 COPY poc/consumer-nuxt ./poc/consumer-nuxt
 
 WORKDIR /workspace/poc/consumer-nuxt

@@ -32,12 +32,9 @@ schema seeds the propagation secrets of the other peers.
 
 ## Libs
 
-Both libs are packed as tgz in `libs/`:
-
-- `libs/naskot-node-hmac-auth-core-1.0.0.tgz`
-- `libs/naskot-node-hmac-auth-core-propagation-1.0.0.tgz`
-
-Each app installs them via `file:./libs/...` references in its `package.json`.
+The peer dep `@naskot/node-hmac-auth-core` is pulled from npm (`^1.0.0`).
+The propagation lib itself is wired locally via `file:../..` so the POC always
+exercises the working tree of this repo, not a published version.
 
 ## Run
 
