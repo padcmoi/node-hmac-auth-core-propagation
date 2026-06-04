@@ -1,0 +1,216 @@
+name: hmac-propagation-poc
+
+networks:
+  poc:
+    driver: bridge
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: hmac-poc-rabbitmq
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_VHOST: hmac-credentials
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - poc
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  mariadb:
+    image: mariadb:11
+    container_name: hmac-poc-mariadb
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: nest_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./scripts/init-mariadb.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - poc
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  phpmyadmin:
+    image: phpmyadmin:5
+    container_name: hmac-poc-phpmyadmin
+    environment:
+      PMA_HOST: mariadb
+      PMA_PORT: "3306"
+      PMA_USER: root
+      PMA_PASSWORD: root
+      UPLOAD_LIMIT: 64M
+    ports:
+      - "8080:80"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - poc
+
+  redis-mgmt:
+    image: redis:7-alpine
+    container_name: hmac-poc-redis-mgmt
+    networks:
+      - poc
+
+  redis-c-nest:
+    image: redis:7-alpine
+    container_name: hmac-poc-redis-c-nest
+    networks:
+      - poc
+
+  redis-nuxt:
+    image: redis:7-alpine
+    container_name: hmac-poc-redis-nuxt
+    networks:
+      - poc
+
+  redis-next:
+    image: redis:7-alpine
+    container_name: hmac-poc-redis-next
+    networks:
+      - poc
+
+  management-nest:
+    build:
+      context: ..
+      dockerfile: poc/management-nest/Dockerfile
+    container_name: hmac-poc-management-nest
+    environment:
+      PORT: "3001"
+      AMQP_HOST: rabbitmq
+      AMQP_PORT: "5672"
+      AMQP_USER: guest
+      AMQP_PASSWORD: guest
+      AMQP_PROTOCOL: amqp
+      AMQP_QUEUE: mgmt-nest
+      PROPAGATION_SECRET: secret-of-mgmt-nest
+      REDIS_URL: redis://redis-mgmt:6379
+      HMAC_SECRET_TOKEN: mesh-pepper-shared
+      DB_HOST: mariadb
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: nest_db
+    ports:
+      - "3001:3001"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mariadb:
+        condition: service_healthy
+      redis-mgmt:
+        condition: service_started
+    networks:
+      - poc
+
+  consumer-nest:
+    build:
+      context: ..
+      dockerfile: poc/consumer-nest/Dockerfile
+    container_name: hmac-poc-consumer-nest
+    environment:
+      PORT: "3002"
+      AMQP_HOST: rabbitmq
+      AMQP_PORT: "5672"
+      AMQP_USER: guest
+      AMQP_PASSWORD: guest
+      AMQP_PROTOCOL: amqp
+      AMQP_QUEUE: c-nest
+      PROPAGATION_SECRET: secret-of-c-nest
+      REDIS_URL: redis://redis-c-nest:6379
+      HMAC_SECRET_TOKEN: mesh-pepper-shared
+    ports:
+      - "3002:3002"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis-c-nest:
+        condition: service_started
+    networks:
+      - poc
+
+  consumer-nuxt:
+    build:
+      context: ..
+      dockerfile: poc/consumer-nuxt/Dockerfile
+    container_name: hmac-poc-consumer-nuxt
+    environment:
+      PORT: "3003"
+      NUXT_PORT: "3003"
+      HOST: "0.0.0.0"
+      NITRO_HOST: "0.0.0.0"
+      NITRO_PORT: "3003"
+      AMQP_HOST: rabbitmq
+      AMQP_PORT: "5672"
+      AMQP_USER: guest
+      AMQP_PASSWORD: guest
+      AMQP_PROTOCOL: amqp
+      AMQP_QUEUE: nuxt
+      PROPAGATION_SECRET: secret-of-nuxt
+      REDIS_URL: redis://redis-nuxt:6379
+      HMAC_SECRET_TOKEN: mesh-pepper-shared
+      DB_HOST: mariadb
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: nuxt_db
+      PEER_REDIS_URLS: redis://redis-mgmt:6379,redis://redis-c-nest:6379,redis://redis-nuxt:6379,redis://redis-next:6379
+    ports:
+      - "3003:3003"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mariadb:
+        condition: service_healthy
+      redis-nuxt:
+        condition: service_started
+    networks:
+      - poc
+
+  consumer-next:
+    build:
+      context: ..
+      dockerfile: poc/consumer-next/Dockerfile
+    container_name: hmac-poc-consumer-next
+    environment:
+      PORT: "3004"
+      HOSTNAME: "0.0.0.0"
+      AMQP_HOST: rabbitmq
+      AMQP_PORT: "5672"
+      AMQP_USER: guest
+      AMQP_PASSWORD: guest
+      AMQP_PROTOCOL: amqp
+      AMQP_QUEUE: next
+      PROPAGATION_SECRET: secret-of-next
+      REDIS_URL: redis://redis-next:6379
+      HMAC_SECRET_TOKEN: mesh-pepper-shared
+      DB_HOST: mariadb
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: next_db
+      PEER_REDIS_URLS: redis://redis-mgmt:6379,redis://redis-c-nest:6379,redis://redis-nuxt:6379,redis://redis-next:6379
+    ports:
+      - "3004:3004"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mariadb:
+        condition: service_healthy
+      redis-next:
+        condition: service_started
+    networks:
+      - poc
