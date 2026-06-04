@@ -148,6 +148,35 @@ curl -s -X POST http://localhost:3001/admin/targets \
 curl -s -X DELETE http://localhost:3001/admin/targets/partner-x
 ```
 
+## End-to-end test harness
+
+A self-contained runner under [`e2e/`](./e2e/) covers 16 scenarios across the
+mesh: ensure + propagate, signed call OK / wrong secret, rotate, revoke,
+local-only ensure (`targets=[]`), dynamic Table 2 add/delete, self-target
+deletion guard, four distinct peppers, offline target with publish-once policy,
+and queue drain on peer restart.
+
+It ships as a sibling container behind the `e2e` Docker Compose profile so it
+never starts with the default `up`. A wrapper script forces both `--build` and
+`--profile e2e` so the stack always boots with the runner attached:
+
+```sh
+./test-e2e.sh up      # docker compose --profile e2e up -d --build
+./test-e2e.sh down    # docker compose --profile e2e down
+```
+
+To run the full sweep against an already-up stack and read the exit code:
+
+```sh
+docker compose --profile e2e run --rm e2e-runner
+echo $?    # 0 on success, 1 if any scenario failed, 2 on harness crash
+```
+
+The runner mounts `/var/run/docker.sock` to stop/start sibling peers from inside
+its container (required for the offline-target scenarios). It uses unique random
+suffixes for every clientId so successive runs do not collide, and it cleans up
+its own credentials at the end so the stack is left in a known-clean state.
+
 ## Local dev (pnpm dev outside Docker)
 
 The compose file publishes every Redis on a distinct host port

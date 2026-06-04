@@ -222,3 +222,25 @@ services:
         condition: service_started
     networks:
       - poc
+
+  e2e-runner:
+    build:
+      context: ..
+      dockerfile: poc/e2e/Dockerfile
+    container_name: hmac-poc-e2e-runner
+    profiles: ["e2e"]
+    depends_on:
+      management-nest:
+        condition: service_started
+      consumer-nest:
+        condition: service_started
+      consumer-nuxt:
+        condition: service_started
+      consumer-next:
+        condition: service_started
+    volumes:
+      # Sibling-container control: the runner needs to stop / start peers to
+      # exercise the offline-target scenarios. Read-write socket is required.
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - poc
