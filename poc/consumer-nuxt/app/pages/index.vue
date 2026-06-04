@@ -31,10 +31,22 @@ const form = reactive({
 });
 
 const callForm = reactive({ clientId: "", target: otherPeers[0]! });
+const targetForm = reactive({ targetAmqpQueue: "", propagationSecret: "", note: "" });
 
 const lastResult = ref<unknown>(null);
 const callResult = ref<unknown>(null);
+const targetResult = ref<unknown>(null);
 const isBusy = ref(false);
+
+interface PropagationTarget {
+  target_amqp_queue: string;
+  propagation_secret: string;
+  note: string | null;
+}
+const dbTargets = computed<PropagationTarget[]>(() => {
+  const state = dbState.value as { targets?: PropagationTarget[] } | null;
+  return state?.targets ?? [];
+});
 
 async function refreshAll() {
   await Promise.all([refreshDb(), refreshPeers(), refreshLocal()]);
@@ -79,6 +91,36 @@ function selectAllTargets() {
 }
 function clearTargets() {
   form.targets = [];
+}
+
+async function submitTarget() {
+  isBusy.value = true;
+  try {
+    targetResult.value = await $fetch("/api/targets", {
+      method: "POST",
+      body: {
+        targetAmqpQueue: targetForm.targetAmqpQueue,
+        propagationSecret: targetForm.propagationSecret,
+        note: targetForm.note || undefined,
+      },
+    });
+    targetForm.targetAmqpQueue = "";
+    targetForm.propagationSecret = "";
+    targetForm.note = "";
+    await refreshDb();
+  } finally {
+    isBusy.value = false;
+  }
+}
+
+async function deleteTarget(queue: string) {
+  isBusy.value = true;
+  try {
+    targetResult.value = await $fetch(`/api/targets/${encodeURIComponent(queue)}`, { method: "DELETE" });
+    await refreshDb();
+  } finally {
+    isBusy.value = false;
+  }
 }
 </script>
 
@@ -166,6 +208,66 @@ function clearTargets() {
         </button>
         <pre v-if="callResult" class="mt-3 overflow-auto rounded bg-slate-900 p-3 text-xs text-slate-100">{{
           JSON.stringify(callResult, null, 2)
+        }}</pre>
+      </section>
+
+      <!-- Targets management (Table 2) -->
+      <section class="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 class="mb-3 text-lg font-medium">Propagation targets (Table 2)</h2>
+        <p class="mb-3 text-sm text-slate-600">
+          Add or remove rows in <code>hmac_propagation_target</code>. Each row carries the AMQP queue name of a peer and the
+          shared <code>propagation_secret</code> used to sign outbound events to it. The row matching this peer's own queue (<code
+            >{{ SELF }}</code
+          >) is locked because it backs the inbound ACK signature.
+        </p>
+        <div class="grid gap-3 md:grid-cols-3">
+          <input
+            v-model="targetForm.targetAmqpQueue"
+            class="rounded border border-slate-300 px-3 py-2"
+            placeholder="targetAmqpQueue (e.g. partner-x)"
+          />
+          <input
+            v-model="targetForm.propagationSecret"
+            class="rounded border border-slate-300 px-3 py-2"
+            placeholder="propagationSecret"
+          />
+          <input v-model="targetForm.note" class="rounded border border-slate-300 px-3 py-2" placeholder="note (optional)" />
+        </div>
+        <button
+          :disabled="isBusy || !targetForm.targetAmqpQueue || !targetForm.propagationSecret"
+          class="mt-3 rounded bg-indigo-600 px-4 py-2 text-white disabled:opacity-50"
+          @click="submitTarget"
+        >
+          Add / update target
+        </button>
+        <table class="mt-4 w-full text-sm">
+          <thead class="bg-slate-100">
+            <tr>
+              <th class="px-3 py-2 text-left">target_amqp_queue</th>
+              <th class="px-3 py-2 text-left">propagation_secret</th>
+              <th class="px-3 py-2 text-left">note</th>
+              <th class="px-3 py-2 text-right">action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="t in dbTargets" :key="t.target_amqp_queue" class="border-t">
+              <td class="px-3 py-2 font-mono">{{ t.target_amqp_queue }}</td>
+              <td class="px-3 py-2 font-mono">{{ t.propagation_secret }}</td>
+              <td class="px-3 py-2">{{ t.note }}</td>
+              <td class="px-3 py-2 text-right">
+                <button
+                  :disabled="isBusy || t.target_amqp_queue === SELF"
+                  class="rounded bg-rose-600 px-3 py-1 text-xs text-white disabled:opacity-30"
+                  @click="deleteTarget(t.target_amqp_queue)"
+                >
+                  {{ t.target_amqp_queue === SELF ? "self (locked)" : "Delete" }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <pre v-if="targetResult" class="mt-3 overflow-auto rounded bg-slate-900 p-3 text-xs text-slate-100">{{
+          JSON.stringify(targetResult, null, 2)
         }}</pre>
       </section>
 

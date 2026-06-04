@@ -9,6 +9,7 @@ import "./dto/revoke.openapi.js";
 import "./dto/rotate.openapi.js";
 import "./dto/state.openapi.js";
 import "./dto/sync-summary.openapi.js";
+import "./dto/target.openapi.js";
 
 import { CallTargetResponseDto } from "./dto/call-target.dto.js";
 import { EnsureResponseDto } from "./dto/ensure.dto.js";
@@ -17,6 +18,7 @@ import { RevokeResponseDto } from "./dto/revoke.dto.js";
 import { RotateResponseDto } from "./dto/rotate.dto.js";
 import { StateResponseDto } from "./dto/state.dto.js";
 import { SyncSummaryDto } from "./dto/sync-summary.dto.js";
+import { TargetMutationResponseDto } from "./dto/target.dto.js";
 
 export const AdminApiTag = ApiTags("admin");
 
@@ -89,4 +91,25 @@ export const HashApi = () =>
     }),
     ApiParam({ name: "plain", description: "Plain secret to hash.", example: "plain-text-secret" }),
     ApiResponse({ status: 200, type: HashResponseDto })
+  );
+
+export const CreateTargetApi = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: "Add or update a propagation target (Table 2)",
+      description:
+        "Upserts a row in `hmac_propagation_target`. Adding a target makes it available to subsequent ensure/rotate/revoke calls. Updating overwrites the `propagationSecret` and `note` while preserving the FK identity.",
+    }),
+    ApiResponse({ status: 201, type: TargetMutationResponseDto })
+  );
+
+export const DeleteTargetApi = () =>
+  applyDecorators(
+    ApiOperation({
+      summary: "Remove a propagation target (Table 2)",
+      description:
+        "Drops the row from `hmac_propagation_target` after cascading the dependent `hmac_credential_target` rows in the same transaction (the FK is `ON DELETE RESTRICT` so we delete the pivots explicitly). Refuses to delete the peer's own self-target row.",
+    }),
+    ApiParam({ name: "queue", description: "Target AMQP queue name to delete.", example: "partner-x" }),
+    ApiResponse({ status: 200, type: TargetMutationResponseDto })
   );

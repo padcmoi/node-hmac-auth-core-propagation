@@ -1,17 +1,29 @@
-import { Body, Controller, Get, Inject, Param, Post } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, Inject, Param, Post } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { hashClientSecret } from "@naskot/node-hmac-auth-core";
 import { HmacAuthService } from "../hmac-auth/hmac-auth.service.js";
 import { HmacPropagatorService } from "../hmac-propagator/hmac-propagator.service.js";
 import { HmacCredential, HmacCredentialTarget, HmacPropagationTarget } from "../hmac-propagation-data/entities/index.js";
-import { AdminApiTag, CallTargetApi, EnsureApi, HashApi, RevokeApi, RotateApi, StateApi, SyncApi } from "./admin.openapi.js";
+import {
+  AdminApiTag,
+  CallTargetApi,
+  CreateTargetApi,
+  DeleteTargetApi,
+  EnsureApi,
+  HashApi,
+  RevokeApi,
+  RotateApi,
+  StateApi,
+  SyncApi,
+} from "./admin.openapi.js";
 import { CallTargetDto, CallTargetResponseDto } from "./dto/call-target.dto.js";
 import { EnsureDto } from "./dto/ensure.dto.js";
 import { HashResponseDto } from "./dto/hash.dto.js";
 import { RevokeDto } from "./dto/revoke.dto.js";
 import { RotateDto } from "./dto/rotate.dto.js";
 import { StateResponseDto } from "./dto/state.dto.js";
+import { CreateTargetDto, TargetMutationResponseDto } from "./dto/target.dto.js";
 
 @AdminApiTag
 @Controller("admin")
@@ -72,5 +84,30 @@ export class AdminController {
   @HashApi()
   hash(@Param("plain") plain: string): HashResponseDto {
     return { hash: hashClientSecret(plain, process.env.HMAC_SECRET_TOKEN) };
+  }
+
+  @Post("targets")
+  @CreateTargetApi()
+  async createTarget(@Body() body: CreateTargetDto): Promise<TargetMutationResponseDto> {
+    const existing = await this.targets.findOne({ where: { targetAmqpQueue: body.targetAmqpQueue } });
+    await this.targets.save({
+      targetAmqpQueue: body.targetAmqpQueue,
+      propagationSecret: body.propagationSecret,
+      note: body.note ?? null,
+    });
+    return { op: existing ? "target.update" : "target.create", targetAmqpQueue: body.targetAmqpQueue };
+  }
+
+  @Delete("targets/:queue")
+  @DeleteTargetApi()
+  async deleteTarget(@Param("queue") queue: string): Promise<TargetMutationResponseDto> {
+    if (queue === process.env.AMQP_QUEUE) {
+      throw new BadRequestException("Cannot delete the peer's own self-target row (it is used for inbound ACK signing).");
+    }
+    await this.targets.manager.transaction(async (tx) => {
+      await tx.delete(HmacCredentialTarget, { targetAmqpQueue: queue });
+      await tx.delete(HmacPropagationTarget, { targetAmqpQueue: queue });
+    });
+    return { op: "target.delete", targetAmqpQueue: queue };
   }
 }
