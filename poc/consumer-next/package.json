@@ -1,0 +1,30 @@
+{
+  "name": "consumer-next",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start -p ${PORT:-3004} -H ${HOSTNAME:-0.0.0.0}"
+  },
+  "dependencies": {
+    "@naskot/node-hmac-auth-core": "file:../libs/naskot-node-hmac-auth-core-1.0.0.tgz",
+    "@naskot/node-hmac-auth-core-propagation": "file:../..",
+    "amqplib": "^0.10.4",
+    "mysql2": "^3.11.0",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "redis": "^4.7.0",
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/postcss": "^4.0.0",
+    "postcss": "^8.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.9.3"
+  }
+}
