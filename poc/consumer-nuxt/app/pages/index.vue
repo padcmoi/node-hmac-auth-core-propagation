@@ -14,6 +14,15 @@ const { data: peerRedis, refresh: refreshPeers } = await useFetch("/api/peer-red
 const { data: dbState, refresh: refreshDb } = await useFetch("/api/state");
 const { data: localClients, refresh: refreshLocal } = await useFetch("/api/local-clients");
 
+// Live tail of the four-peer Redis state. Cheap glob (`hmac:*`) so 1s is fine.
+let peerRedisTimer: ReturnType<typeof setInterval> | null = null;
+onMounted(() => {
+  peerRedisTimer = setInterval(() => refreshPeers(), 1000);
+});
+onUnmounted(() => {
+  if (peerRedisTimer) clearInterval(peerRedisTimer);
+});
+
 const form = reactive({
   op: "ensure" as "ensure" | "rotate" | "revoke",
   clientId: "",

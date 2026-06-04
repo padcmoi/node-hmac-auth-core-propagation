@@ -55,6 +55,17 @@ export default function Page() {
     refreshAll();
   }, []);
 
+  // Live tail of the four-peer Redis state. Cheap glob (`hmac:*`) so 1s is fine.
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetch("/api/peer-redis")
+        .then((r) => r.json())
+        .then(setPeerRedis)
+        .catch(() => {});
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
   function toggleTarget(p: string) {
     setTargets((cur) => (cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]));
   }
