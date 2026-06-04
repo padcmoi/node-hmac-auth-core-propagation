@@ -1,7 +1,7 @@
 {
   "name": "@naskot/node-hmac-auth-core-propagation",
-  "version": "0.0.0",
-  "description": "Credential propagation layer for @naskot/node-hmac-auth-core. RabbitMQ-backed orchestration. Work in progress.",
+  "version": "1.0.0",
+  "description": "RabbitMQ-backed credential propagation layer on top of @naskot/node-hmac-auth-core. Peer-to-peer rotation, ack-tracked targets, no DLQ, 0 desync guarantee.",
   "repository": {
     "type": "git",
     "url": "https://github.com/padcmoi/node-hmac-auth-core-propagation"
@@ -12,18 +12,66 @@
   },
   "license": "MIT",
   "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "test": "vitest run",
+    "dev:test": "vitest",
+    "check": "tsc --noEmit",
+    "prepublishOnly": "npm run check && npm run test && npm run build",
+    "lint": "eslint \"src/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "format": "prettier --write ."
+  },
   "keywords": [
     "hmac",
     "auth",
     "propagation",
+    "credential-propagation",
+    "rotation",
     "rabbitmq",
     "amqp",
-    "redis"
+    "nodejs",
+    "typescript",
+    "redis",
+    "microservices",
+    "peer-to-peer"
   ],
   "engines": {
     "node": ">=18"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "peerDependencies": {
+    "@naskot/node-hmac-auth-core": "^1.0.0"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@naskot/node-hmac-auth-core": "file:../node-hmac-auth-core/.trash/naskot-node-hmac-auth-core-1.0.0.tgz",
+    "@types/amqplib": "^0.10.5",
+    "@types/node": "^24.6.0",
+    "eslint": "^10.2.1",
+    "prettier": "^3.8.3",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.58.2",
+    "vitest": "^3.2.4"
   }
 }
