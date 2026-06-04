@@ -31,7 +31,7 @@
     "test": "vitest run",
     "dev:test": "vitest",
     "check": "tsc --noEmit",
-    "prepublishOnly": "npm run check && npm run test && npm run build",
+    "prepublishOnly": "npm run lint && npm run check && npm run test && npm run build",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "format": "prettier --write ."
