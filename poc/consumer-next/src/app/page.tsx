@@ -60,15 +60,24 @@ export default function Page() {
     refreshAll();
   }, []);
 
-  // Live tail of the four-peer Redis state. Cheap glob (`hmac:*`) so 1s is fine.
+  // Live tail of the four-peer Redis state and the local clientId list, both at 1Hz.
   useEffect(() => {
-    const id = setInterval(() => {
+    const peersId = setInterval(() => {
       fetch("/api/peer-redis")
         .then((r) => r.json())
         .then(setPeerRedis)
         .catch(() => {});
     }, 1000);
-    return () => clearInterval(id);
+    const localId = setInterval(() => {
+      fetch("/api/local-clients")
+        .then((r) => r.json())
+        .then(setLocalClients)
+        .catch(() => {});
+    }, 1000);
+    return () => {
+      clearInterval(peersId);
+      clearInterval(localId);
+    };
   }, []);
 
   function toggleTarget(p: string) {
