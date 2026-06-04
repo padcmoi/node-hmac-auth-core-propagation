@@ -1,4 +1,5 @@
 import type { ConsumeMessage } from "amqplib";
+import { hashClientSecret } from "@naskot/node-hmac-auth-core";
 import { buildConsumeHandler } from "./consume.js";
 import { HmacPropagationError } from "./errors.js";
 import { runSync } from "./sync.js";
@@ -91,6 +92,12 @@ export async function createPropagator(options: PropagatorOptions): Promise<Prop
       targets: input.targets,
     });
 
+    // Always apply locally. The local peer is itself part of the mesh; a
+    // credential created here must be readable here, regardless of whether
+    // remote targets are also being notified.
+    const secretHash = hashClientSecret(input.secret, auth.secretToken);
+    await auth.clients.setSecretHash(input.clientId, secretHash, input.expiresAt ?? undefined, input.allowedIps);
+
     return { clientId: input.clientId, op };
   }
 
@@ -113,12 +120,21 @@ export async function createPropagator(options: PropagatorOptions): Promise<Prop
       secretPlain: input.secret,
     });
 
+    // Apply the new hash locally so the rotate takes effect on this peer even
+    // if no remote target is reachable right now.
+    const secretHash = hashClientSecret(input.secret, auth.secretToken);
+    await auth.clients.setSecretHash(input.clientId, secretHash, existing.expiresAt ?? undefined, existing.allowedIps);
+
     return { clientId: input.clientId };
   }
 
   async function revoke(input: RevokeInput) {
     const management = requireManagement();
     const track = input.track ?? "http";
+    const auth = track === "http" ? options.hmacHttpAuth : options.hmacMessageAuth;
+    if (!auth) {
+      throw new HmacPropagationError("INVALID_OPTIONS", `No ${track} auth instance configured`);
+    }
 
     await management.upsertCredentialWithTargets({
       clientId: input.clientId,
@@ -127,6 +143,9 @@ export async function createPropagator(options: PropagatorOptions): Promise<Prop
       secretPlain: null,
       targets: input.targets,
     });
+
+    // Drop the credential locally too. The remote targets will be notified by sync.
+    await auth.clients.delete(input.clientId);
 
     return { clientId: input.clientId };
   }
