@@ -54,6 +54,12 @@ export async function createPropagator(options: PropagatorOptions): Promise<Prop
     logger,
   });
 
+  // Now that the real handler is installed, ask the transport to register
+  // `basic.consume`. Doing it earlier would race: a redelivered message can
+  // hit the no-op placeholder, sit Unacked, and freeze the consumer on
+  // prefetch=1.
+  await transport.startConsume();
+
   function requireManagement() {
     if (!options.management) {
       throw new HmacPropagationError(

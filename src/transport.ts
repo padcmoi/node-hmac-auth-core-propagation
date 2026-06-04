@@ -15,6 +15,7 @@ export interface Transport {
   ensureQueueDeclared: (queueName: string) => Promise<void>;
   ackMessage: (msg: ConsumeMessage) => void;
   nackMessage: (msg: ConsumeMessage, requeue: boolean) => void;
+  startConsume: () => Promise<void>;
   ownQueueName: string;
   close: () => Promise<void>;
 }
@@ -41,8 +42,17 @@ export async function createTransport(input: CreateTransportInput): Promise<Tran
   let confirmCh: ConfirmChannel | null = null;
   let consumeCh: Channel | null = null;
   let stopped = false;
+  let consumeRequested = false;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let backoffMs = 1000;
+
+  async function registerConsume() {
+    if (!consumeCh) return;
+    await consumeCh.consume(ownQueueName, (msg) => {
+      if (msg === null) return;
+      void runHandler(msg);
+    });
+  }
 
   // Queues we have already declared on the current channel. Default exchange
   // silently drops messages whose routing key matches no queue, so the producer
@@ -60,6 +70,10 @@ export async function createTransport(input: CreateTransportInput): Promise<Tran
         username: options.amqpUser,
         password: options.amqpPassword,
         vhost,
+        // 10s heartbeat (default would be 60s) so RabbitMQ evicts dead consumers fast.
+        // A peer that died with unacked messages: broker requeues them within 2x10s=20s,
+        // the next peer-on-restart picks them up immediately instead of waiting ~120s.
+        heartbeat: 10,
       });
       connection.on("error", (err) => logger.warn("[propagation] amqp connection error", err));
       connection.on("close", () => {
@@ -75,10 +89,11 @@ export async function createTransport(input: CreateTransportInput): Promise<Tran
       await consumeCh.assertQueue(ownQueueName, { durable: true });
       declaredQueues.add(ownQueueName);
 
-      await consumeCh.consume(ownQueueName, (msg) => {
-        if (msg === null) return;
-        void runHandler(msg);
-      });
+      // CRITICAL: we register basic.consume only AFTER the caller signals "handler is ready"
+      // (transport.startConsume). Otherwise a redelivered message can race between the
+      // placeholder no-op handler and the real one, leaving it Unacked on the channel and
+      // freezing the consumer because of prefetch=1.
+      if (consumeRequested) await registerConsume();
 
       backoffMs = 1000;
       logger.info(`[propagation] amqp connected, queue=${ownQueueName} vhost=${vhost}`);
@@ -171,5 +186,13 @@ export async function createTransport(input: CreateTransportInput): Promise<Tran
 
   await connect();
 
-  return { publishToQueue, ensureQueueDeclared, ackMessage, nackMessage, ownQueueName, close };
+  // Explicit start so the caller can finish wiring its real consume handler
+  // before basic.consume registers. Idempotent and reconnect-safe (the flag is
+  // checked again inside connect() after each reconnect).
+  async function startConsume() {
+    consumeRequested = true;
+    await registerConsume();
+  }
+
+  return { publishToQueue, ensureQueueDeclared, ackMessage, nackMessage, startConsume, ownQueueName, close };
 }
