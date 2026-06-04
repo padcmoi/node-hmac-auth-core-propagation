@@ -5,8 +5,17 @@ coverage
 .tsup
 .nyc_output
 
-# Scratch space (specs, plans, drafts, antipatterns) — never committed
+# Framework build artefacts of the POC apps. Generated in the container, never committed.
+.next
+.nuxt
+.output
+next-env.d.ts
+
+# Scratch space (specs, plans, drafts, antipatterns), never committed
 .trash/
+
+# Local tgz packed from sibling lib for dev wiring
+*.tgz
 
 # Lockfile-less by design for a library; consumers own their lockfile
 package-lock.json

@@ -1,0 +1,17 @@
+**/node_modules
+**/.next
+**/.nuxt
+**/.output
+.git
+.trash
+.tsbuildinfo
+.tsup
+coverage
+.nyc_output
+test
+src
+docs
+*.log
+.vscode
+.idea
+.DS_Store
