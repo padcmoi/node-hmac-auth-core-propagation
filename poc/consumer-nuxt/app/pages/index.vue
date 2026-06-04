@@ -21,7 +21,7 @@ const form = reactive({
   targets: [] as string[],
 });
 
-const callForm = reactive({ clientId: "", target: otherPeers[0] });
+const callForm = reactive({ clientId: "", target: otherPeers[0]! });
 
 const lastResult = ref<unknown>(null);
 const callResult = ref<unknown>(null);

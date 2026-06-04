@@ -1,3 +1,4 @@
+import { defineNitroPlugin } from "nitropack/runtime";
 import { getHmacPropagatorService } from "../services/hmac-propagator.service";
 
 export default defineNitroPlugin(async () => {
